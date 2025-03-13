@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  mariadb:
+    build: ./mariadb
+    container_name: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: apache
+      MYSQL_DATABASE: SalleFetes
+      MYSQL_USER: Frantz
+      MYSQL_PASSWORD: apache2
+    ports:
+      - "3307:3306"
+    networks:
+      - app-network
+
+  flask_app1:
+    build: ./flask-app
+    container_name: flask_app1
+    environment:
+      FLASK_ENV: development
+      FLASK_APP: run.py
+    ports:
+      - "5001:5001"
+    depends_on:
+      - mariadb
+    networks:
+      - app-network
+
+  flask_app2:
+    build: ./flask-app
+    container_name: flask_app2
+    environment:
+      FLASK_ENV: development
+      FLASK_APP: run.py
+    ports:
+      - "5002:5002"
+    depends_on:
+      - mariadb
+    networks:
+      - app-network
+
+  haproxy:
+    image: haproxy:latest
+    container_name: haproxy
+    ports:
+      - "8080:80"
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - flask_app1
+      - flask_app2
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

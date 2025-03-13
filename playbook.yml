@@ -1,0 +1,91 @@
+---
+- name: Déployer l'application Flask avec MariaDB et HAProxy
+  hosts: all
+  become: yes
+  vars:
+    app_dir: "/opt/flask-mariadb-haproxy"
+    docker_compose_version: "2.23.0"
+
+  tasks:
+    - name: Installer les dépendances système
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3-pip
+          - python3-setuptools
+          - python3-venv
+        state: present
+        update_cache: yes
+
+    - name: Ajouter la clé GPG de Docker
+      apt_key:
+        url: https://download.docker.com/linux/debian/gpg
+        state: present
+
+    - name: Ajouter le dépôt Docker pour Debian bullseye
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/debian bullseye stable"
+        state: present
+
+    - name: Installer Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+        update_cache: yes
+
+    - name: Télécharger Docker Compose
+      get_url:
+        url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-linux-x86_64"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+
+    - name: Vérifier l'installation de Docker Compose
+      command: docker-compose --version
+      register: docker_compose_version
+      changed_when: false
+
+    - debug:
+        msg: "{{ docker_compose_version.stdout }}"
+
+    - name: Démarrer et activer Docker
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Créer le répertoire de l'application
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copier le fichier docker-compose.yml
+      copy:
+        src: "{{ playbook_dir }}/docker-compose.yml"  # Chemin relatif au playbook
+        dest: "{{ app_dir }}/docker-compose.yml"
+
+    - name: Copier le répertoire haproxy
+      copy:
+        src: haproxy/
+        dest: "{{ app_dir }}/haproxy"
+
+    - name: Copier le répertoire flask-app
+      copy:
+        src: flask-app/
+        dest: "{{ app_dir }}/flask-app"
+
+    - name: Copier le répertoire mariadb
+      copy:
+        src: mariadb/
+        dest: "{{ app_dir }}/mariadb"
+
+    - name: Démarrer les services avec Docker Compose
+      command: docker-compose up -d
+      args:
+        chdir: "{{ app_dir }}"
