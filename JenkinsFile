@@ -1,0 +1,74 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_COMPOSE_DIR = "/opt/flask-mariadb-haproxy" // Adapt this path if needed
+    }
+
+    stages {
+
+        stage('Cloner le dépôt') {
+            steps {
+                // Si ton code source est dans un repository git
+                git 'https://ton-depot-git.com/ton-projet.git'
+            }
+        }
+
+        stage('Démarrer les services Docker') {
+            steps {
+                script {
+                    echo "🔧 Construction des images Docker et démarrage des services"
+                    sh "docker-compose -f ${DOCKER_COMPOSE_DIR}/docker-compose.yml build"
+                    sh "docker-compose -f ${DOCKER_COMPOSE_DIR}/docker-compose.yml up -d"
+                }
+            }
+        }
+
+        stage('Vérifier les conteneurs') {
+            steps {
+                script {
+                    echo "🛠️ Vérification des conteneurs"
+                    // Vérifie si les conteneurs sont en marche
+                    sh "docker ps | grep mariadb"
+                    sh "docker ps | grep flask_app1"
+                    sh "docker ps | grep flask_app2"
+                    sh "docker ps | grep haproxy"
+                }
+            }
+        }
+
+        stage('Exécuter les tests unitaires') {
+            steps {
+                script {
+                    echo "🧪 Lancement des tests unitaires pour Flask"
+                    // Teste flask_app1
+                    sh "docker exec flask_app1 pytest"
+                    // Teste flask_app2
+                    sh "docker exec flask_app2 pytest"
+                }
+            }
+        }
+
+    }
+
+    post {
+        always {
+            stage('Nettoyage') {
+                steps {
+                    script {
+                        echo "🧹 Nettoyage : Arrêt des conteneurs"
+                        sh "docker-compose -f ${DOCKER_COMPOSE_DIR}/docker-compose.yml down"
+                    }
+                }
+            }
+        }
+
+        success {
+            echo "✅ Pipeline terminé avec succès !"
+        }
+
+        failure {
+            echo "❌ Pipeline échoué, veuillez vérifier les logs."
+        }
+    }
+}
