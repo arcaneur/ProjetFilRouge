@@ -1,0 +1,125 @@
+---
+- name: Installer et configurer MariaDB
+  hosts: all
+  become: yes
+
+  vars:
+    http_port: 80
+    mariadb_root_password: "apache"
+    mariadb_database: "SalleFetes"
+    mariadb_user: "Frantz"
+    mariadb_password: "apache2"
+    contacts:
+      - nom: "Dupont"
+        prenom: "Jean"
+        adresse: "123 Rue de la Paix"
+        telephone: "0601010101"
+        email: "jean.dupont@example.com"
+      - nom: "Blanc"
+        prenom: "Clara"
+        adresse: "2223 Rue des Étoiles"
+        telephone: "0610101010"
+        email: "clara.blanc@example.com"
+
+  tasks:
+    - name: Installer les paquets nécessaires
+      apt:
+        name:
+          - mariadb-server
+        state: present
+        update_cache: yes
+
+    - name: Installer les paquets nécessaires
+      apt:
+        name:
+          - apache2
+          - git
+          - mariadb-server
+          - python3-pymysql
+          - python3-mysqldb    # Ajoutons aussi celui-ci pour plus de compatibilité
+        state: present
+        update_cache: yes
+
+
+    - name: Démarrer et activer le service MariaDB
+      systemd:
+        name: mariadb
+        enabled: yes
+        state: started
+
+    - name: Configurer le mot de passe root de MariaDB
+      mysql_user:
+        name: root
+        host: localhost
+        password: "{{ mariadb_root_password }}"
+        state: present
+        login_user: root
+        login_password: "{{ mariadb_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        check_implicit_admin: yes
+        column_case_sensitive: false
+
+    - name: Configurer le mot de passe root de MariaDB
+      mysql_user:
+        name: root
+        host: localhost
+        password: "{{ mariadb_root_password }}"
+        state: present
+        login_user: root
+        login_password: "{{ mariadb_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        check_implicit_admin: yes
+        column_case_sensitive: false
+
+    - name: Créer une base de données
+      mysql_db:
+        name: "{{ mariadb_database }}"
+        state: present
+        login_user: root
+        login_password: "{{ mariadb_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+    - name: Créer un utilisateur MariaDB
+      mysql_user:
+        name: "{{ mariadb_user }}"
+        password: "{{ mariadb_password }}"
+        priv: "{{ mariadb_database }}.*:ALL"
+        state: present
+        login_user: root
+        login_password: "{{ mariadb_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        column_case_sensitive: false
+
+    - name: Appliquer les privilèges
+      mysql_user:
+        name: "{{ mariadb_user }}"
+        priv: '{{ mariadb_database }}.*:ALL,GRANT'
+        state: present
+        login_user: root
+        login_password: "{{ mariadb_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        column_case_sensitive: false
+
+    - name: Créer la table contacts
+      mysql_query:
+        query: |
+          CREATE TABLE IF NOT EXISTS {{ mariadb_database }}.contacts (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            nom VARCHAR(50),
+            prenom VARCHAR(50),
+            adresse VARCHAR(100),
+            telephone VARCHAR(15),
+            email VARCHAR(50)
+          );
+        login_user: root
+        login_password: "{{ mariadb_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Insérer des utilisateurs dans la table contacts
+      mysql_query:
+        query: |
+          INSERT INTO {{ mariadb_database }}.contacts (nom, prenom, adresse, telephone, email)
+          VALUES ('{{ item.nom }}', '{{ item.prenom }}', '{{ item.adresse }}', '{{ item.telephone }}', '{{ item.email }}');
+        login_user: root
+        login_password: "{{ mariadb_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      with_items: "{{ contacts }}"
